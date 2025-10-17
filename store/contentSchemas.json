@@ -9,7 +9,7 @@
           "default": false
         },
         "textMode": {
-          "default": "html",
+          "default": "rich-text",
           "type": "string",
           "title": "admin/editor.info-card.textMode.title",
           "enum": ["html", "rich-text"],
@@ -119,81 +119,6 @@
           "title": "admin/editor.blockClass.title",
           "description": "admin/editor.blockClass.description",
           "type": "string"
-        }
-      }
-    },
-    "ProductDescription": {
-      "title": "admin/editor.product-description.title",
-      "type": "object",
-      "properties": {
-        "title": {
-          "$ref": "app:vtex.native-types#/definitions/text",
-          "title": "admin/editor.product-description.title-prop.title"
-        }
-      }
-    },
-    "SearchBar": {
-      "title": "admin/editor.search-bar.title",
-      "type": "object",
-      "properties": {
-        "placeholder": {
-          "$ref": "app:vtex.native-types#/definitions/text",
-          "title": "admin/editor.search-bar.placeholder.title"
-        }
-      }
-    },
-    "ProductPrice": {
-      "properties": {
-        "labelSellingPrice": {
-          "title": "admin/editor.productPrice.labelSellingPrice",
-          "$ref": "app:vtex.native-types#/definitions/text",
-          "default": "store/pricing.to"
-        },
-        "labelListPrice": {
-          "title": "admin/editor.productPrice.labelListPrice",
-          "$ref": "app:vtex.native-types#/definitions/text",
-          "default": "store/pricing.from"
-        }
-      }
-    },
-    "Newsletter": {
-      "properties": {
-        "placeholder": {
-          "title": "admin/editor.newsletter.placeholder",
-          "$ref": "app:vtex.native-types#/definitions/text",
-          "default": "store/newsletter.placeholder"
-        },
-        "label": {
-          "title": "admin/editor.newsletter.label",
-          "$ref": "app:vtex.native-types#/definitions/text",
-          "default": "store/newsletter.label"
-        },
-        "submit": {
-          "title": "admin/editor.newsletter.submit",
-          "$ref": "app:vtex.native-types#/definitions/text",
-          "default": "store/newsletter.submit"
-        }
-      }
-    },
-    "SKUSelector": {
-      "type": "object",
-      "properties": {
-        "seeMoreLabel": {
-          "title": "admin/editor.skuSelector.seeMoreLabel.title",
-          "description": "admin/editor.skuSelector.seeMoreLabel.description",
-          "default": "store/skuSelector.seeMore",
-          "$ref": "app:vtex.native-types#/definitions/text"
-        }
-      }
-    },
-    "NotificationBar": {
-      "type": "object",
-      "description": "admin/editor.notification-bar.description",
-      "properties": {
-        "content": {
-          "title": "admin/editor.notification-bar.content.title",
-          "description": "admin/editor.notification-bar.content.description",
-          "$ref": "app:vtex.native-types#/definitions/text"
         }
       }
     }

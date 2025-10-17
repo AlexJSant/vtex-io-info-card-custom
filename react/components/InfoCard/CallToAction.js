@@ -1,5 +1,4 @@
 import React from 'react'
-import { Button } from 'vtex.styleguide'
 import { Link } from 'vtex.render-runtime'
 import { useCssHandles } from 'vtex.css-handles'
 
@@ -20,7 +19,15 @@ const CallToAction = ({ mode, text, url, linkTarget }) => {
   // eslint-disable-next-line no-shadow
   const ActionWrapper = ({ text, mode }) => {
     if (mode === callActionValues.BUTTON) {
-      return <Button onClick={noop}>{text}</Button>
+      return (
+        <button
+          onClick={noop}
+          className="vtex-button bw1 ba b--action-primary bg-action-primary white br2 ph5 pv3 pointer"
+          type="button"
+        >
+          {text}
+        </button>
+      )
     }
 
     // Mode is link

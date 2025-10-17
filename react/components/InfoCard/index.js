@@ -21,7 +21,7 @@ import {
   textAlignmentValues,
   textModeTypes,
 } from './SchemaTypes'
-import { SanitizedHTML } from '../SanitizedHTML'
+import { SanitizedHTML } from '../SanitizedHTML.js'
 
 const ALLOWED_TAGS = ['p', 'span', 'a', 'div', 'br']
 const ALLOWED_ATTRS = {
@@ -301,7 +301,7 @@ MemoizedInfoCard.defaultProps = {
   imageAltText: '',
   mobileImageUrl: '',
   textAlignment: textAlignmentTypes.TEXT_ALIGNMENT_LEFT.value,
-  textMode: textModeTypes.TEXT_MODE_HTML.value,
+  textMode: textModeTypes.TEXT_MODE_RICHTEXT.value,
   linkTarget: '_self',
   callToActionLinkTarget: '_self',
   fetchpriority: 'auto',
@@ -357,7 +357,7 @@ MemoizedInfoCard.schema = {
       title: 'admin/editor.info-card.textMode.title',
       description: 'admin/editor.info-card.textMode.description',
       type: 'string',
-      default: textModeTypes.TEXT_MODE_HTML.value,
+      default: textModeTypes.TEXT_MODE_RICHTEXT.value,
       enum: getEnumValues(textModeTypes),
       enumNames: getEnumNames(textModeTypes),
       isLayout: true,
