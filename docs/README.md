@@ -1,3 +1,5 @@
+> ⚠️ **Attention:** This project is still under development!
+
 >📢 **Disclaimer** Don't fork this project. Use it, [contribute](https://github.com/vtex-apps/store-components) to it or open issues through [Store Discussion](https://github.com/vtex-apps/store-discussion) to help us evolve it. 
 
 # Info Card
