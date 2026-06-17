@@ -2,7 +2,19 @@
   "info-card-standalone": {
     "component": "InfoCard",
     "content": {
-      "$ref": "app:sunhouse.info-card-app#/definitions/InfoCard"
+      "$ref": "app:sunhouse.info-card-custom#/definitions/InfoCard"
+    }
+  },
+  "list-context.info-card-list": {
+    "component": "InfoCardList",
+    "composition": "children",
+    "allowed": "*",
+    "content": {
+      "properties": {
+        "infoCards": {
+          "$ref": "app:sunhouse.info-card-custom#/definitions/InfoCards"
+        }
+      }
     }
   }
 }

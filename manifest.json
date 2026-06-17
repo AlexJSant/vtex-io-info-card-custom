@@ -1,10 +1,10 @@
 {
   "vendor": "sunhouse",
-  "name": "info-card-app",
-  "version": "3.178.5",
-  "title": "Custom Info Card - Standalone Version",
+  "name": "info-card-custom",
+  "version": "0.0.1",
+  "title": "Info Card Custom",
   "defaultLocale": "pt-BR",
-  "description": "Info Card App by VTEX, customized to be partially recreated based on SEO and other needs. Standalone Version.",
+  "description": "Info Card Custom, based on Store Components App by VTEX - customized to enhanced standalone version.",
   "builders": {
     "react": "3.x",
     "store": "0.x",
@@ -14,6 +14,7 @@
   "mustUpdateAt": "2019-04-02",
   "dependencies": {
     "vtex.css-handles": "1.x",
+    "vtex.list-context": "0.x",
     "vtex.native-types": "0.x",
     "vtex.render-runtime": "8.x",
     "vtex.rich-text": "0.x"

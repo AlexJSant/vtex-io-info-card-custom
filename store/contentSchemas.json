@@ -1,6 +1,7 @@
 {
   "definitions": {
     "InfoCard": {
+      "type": "object",
       "properties": {
         "isFullModeStyle": {
           "title": "admin/editor.info-card.isFullModeStyle.title",
@@ -9,7 +10,7 @@
           "default": false
         },
         "textMode": {
-          "default": "rich-text",
+          "default": "html",
           "type": "string",
           "title": "admin/editor.info-card.textMode.title",
           "enum": ["html", "rich-text"],
@@ -120,6 +121,13 @@
           "description": "admin/editor.blockClass.description",
           "type": "string"
         }
+      }
+    },
+    "InfoCards": {
+      "type": "array",
+      "title": "admin/editor.info-card-list.infoCards.title",
+      "items": {
+        "$ref": "#/definitions/InfoCard"
       }
     }
   }

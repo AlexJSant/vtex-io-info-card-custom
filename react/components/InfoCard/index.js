@@ -22,6 +22,7 @@ import {
   textModeTypes,
 } from './SchemaTypes'
 import { SanitizedHTML } from '../SanitizedHTML.js'
+import editorMessages from '../../messages/editorMessages'
 
 const ALLOWED_TAGS = ['p', 'span', 'a', 'div', 'br']
 const ALLOWED_ATTRS = {
@@ -301,7 +302,7 @@ MemoizedInfoCard.defaultProps = {
   imageAltText: '',
   mobileImageUrl: '',
   textAlignment: textAlignmentTypes.TEXT_ALIGNMENT_LEFT.value,
-  textMode: textModeTypes.TEXT_MODE_RICHTEXT.value,
+  textMode: textModeTypes.TEXT_MODE_HTML.value,
   linkTarget: '_self',
   callToActionLinkTarget: '_self',
   fetchpriority: 'auto',
@@ -309,20 +310,20 @@ MemoizedInfoCard.defaultProps = {
 }
 
 MemoizedInfoCard.schema = {
-  title: 'admin/editor.info-card.title',
-  description: 'admin/editor.info-card.description',
+  title: editorMessages.info_card_title.id,
+  description: editorMessages.info_card_description.id,
   type: 'object',
   properties: {
     isFullModeStyle: {
-      title: 'admin/editor.info-card.isFullModeStyle.title',
-      description: 'admin/editor.info-card.isFullModeStyle.description',
+      title: editorMessages.info_card_isFullModeStyle_title.id,
+      description: editorMessages.info_card_isFullModeStyle_description.id,
       type: 'boolean',
       default: false,
       isLayout: true,
     },
     textPosition: {
-      title: 'admin/editor.info-card.textPosition.title',
-      description: 'admin/editor.info-card.textPosition.description',
+      title: editorMessages.info_card_textPosition_title.id,
+      description: editorMessages.info_card_textPosition_description.id,
       type: 'string',
       enum: getEnumValues(textPositionTypes),
       enumNames: getEnumNames(textPositionTypes),
@@ -330,8 +331,8 @@ MemoizedInfoCard.schema = {
       isLayout: true,
     },
     callToActionMode: {
-      title: 'admin/editor.info-card.callToActionMode.title',
-      description: 'admin/editor.info-card.callToActionMode.description',
+      title: editorMessages.info_card_callToActionMode_title.id,
+      description: editorMessages.info_card_callToActionMode_description.id,
       type: 'string',
       enum: getEnumValues(callToActionModeTypes),
       enumNames: getEnumNames(callToActionModeTypes),
@@ -339,14 +340,14 @@ MemoizedInfoCard.schema = {
       isLayout: true,
     },
     imageAltText: {
-      title: 'admin/editor.info-card.imageAltText.title',
-      description: 'admin/editor.info-card.imageAltText.description',
+      title: editorMessages.info_card_imageAltText_title.id,
+      description: editorMessages.info_card_imageAltText_description.id,
       type: 'string',
       default: '',
     },
     textAlignment: {
-      title: 'admin/editor.info-card.textAlignment.title',
-      description: 'admin/editor.info-card.textAlignment.description',
+      title: editorMessages.info_card_textAlignment_title.id,
+      description: editorMessages.info_card_textAlignment_description.id,
       type: 'string',
       default: textAlignmentTypes.TEXT_ALIGNMENT_LEFT.value,
       enum: getEnumValues(textAlignmentTypes),
@@ -354,17 +355,17 @@ MemoizedInfoCard.schema = {
       isLayout: true,
     },
     textMode: {
-      title: 'admin/editor.info-card.textMode.title',
-      description: 'admin/editor.info-card.textMode.description',
+      title: editorMessages.info_card_textMode_title.id,
+      description: editorMessages.info_card_textMode_description.id,
       type: 'string',
-      default: textModeTypes.TEXT_MODE_RICHTEXT.value,
+      default: textModeTypes.TEXT_MODE_HTML.value,
       enum: getEnumValues(textModeTypes),
       enumNames: getEnumNames(textModeTypes),
       isLayout: true,
     },
     blockClass: {
-      title: 'admin/editor.blockClass.title',
-      description: 'admin/editor.blockClass.description',
+      title: editorMessages.blockClass_title.id,
+      description: editorMessages.blockClass_description.id,
       type: 'string',
       isLayout: true,
     },
