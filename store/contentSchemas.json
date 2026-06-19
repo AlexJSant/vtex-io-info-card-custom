@@ -115,11 +115,19 @@
             "admin/editor.info-card.textAlignment.center",
             "admin/editor.info-card.textAlignment.right"
           ]
-        },
+        }
+      }
+    },
+    "InfoCardList": {
+      "type": "object",
+      "properties": {
         "blockClass": {
           "title": "admin/editor.blockClass.title",
           "description": "admin/editor.blockClass.description",
           "type": "string"
+        },
+        "infoCards": {
+          "$ref": "#/definitions/InfoCards"
         }
       }
     },

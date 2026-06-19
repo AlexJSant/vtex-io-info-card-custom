@@ -4,6 +4,195 @@ This document records the customizations, fixes, and improvements implemented in
 
 ---
 
+## 📅 Date: 18/06/2026
+
+### 🎯 Session Objectives
+
+- Rename exported block `info-card-standalone` → `info-card-custom` (align name with app identity `sunhouse.info-card-custom`)
+- Fix `blockClass` not reaching CSS handles when declared in `blocks.json` (prop existed in schema but was not applied in the DOM)
+- Move `blockClass` to **list level** on `list-context.info-card-list` so all cards in `infoCards[]` inherit the same class — no need to repeat it per array item
+- Fix `blockClass` propagation from `list-context.info-card-list` to **all** CSS handles when Info Cards are rendered inside a layout child (e.g. `slider-layout`)
+- Ensure Rich Text handles (`container`, `wrapper`, `heading`, `paragraph`, etc.) receive info-card modifiers (`--main-banner`, `--main-banner-home`) in addition to slider modifiers (`--banner`, `--banner-main`)
+- Support `blockClass` as `string` or `string[]` in `blocks.json`, matching VTEX IO conventions
+- Enable theme CSS porting from `vtex.store-components` selectors (e.g. `.heading--main-banner-home`) to `sunhouse.slider-layout.css` without selector remapping
+
+---
+
+## ✅ Implemented Changes (18/06/2026)
+
+### 6. Block Rename — `info-card-standalone` → `info-card-custom`
+
+**Goal:** Use a block name consistent with the app vendor/name (`sunhouse.info-card-custom`) and avoid confusion with the native `info-card` from `vtex.store-components`.
+
+**Breaking change for themes:** Replace every `info-card-standalone` reference in theme `blocks.json` / templates with `info-card-custom`.
+
+| Before | After |
+| ------ | ----- |
+| `"info-card-standalone#hero"` | `"info-card-custom#hero"` |
+| Block key in `store/interfaces.json` | `info-card-custom` |
+
+**Files modified:**
+
+| File | Change |
+| ---- | ------ |
+| `store/interfaces.json` | Block key renamed to `info-card-custom` |
+| `docs/README.md` | Examples and props tables updated |
+| `docs/DEVELOPMENT_LOG.md` | All references updated |
+
+**Status:** ✅ Implemented
+
+---
+
+### 7. `blockClass` Foundation — List-Level Inheritance + `useCssHandles` Wiring
+
+**Goal:** Make `blockClass` actually generate CSS handle modifiers (`.infoCardContainer--my-class`) and define the correct placement for list vs. single-card usage.
+
+**Problems identified (code review / chat):**
+
+| Issue | Detail |
+| ----- | ------ |
+| `blockClass` inert on standalone card | Prop declared in `propTypes` / schema but never passed to `useCssHandles`; VTEX extension context applies it only when the component is the **registered IO block** |
+| `blockClass` per `infoCards[]` item | Impractical — merchants had to repeat the same class on every array entry; items rendered via `<InfoCard {...props} />` have no IO block context |
+| `CallToAction` handles ignored `blockClass` | Child component called `useCssHandles` without inheriting parent modifiers |
+
+**How VTEX `useCssHandles` works (reference):**
+
+Per [`vtex.css-handles`](https://github.com/vtex-apps/css-handles), the hook reads `blockClass` from the block extension context (`props.blockClass` / `content.blockClass`) and appends modifiers as `--{blockClass}` on each handle. When a component is rendered **programmatically** inside `list-context` (not as its own IO block instance), that context is missing — modifiers must be applied manually.
+
+**Solution:**
+
+1. **`react/modules/cssHandlesWithBlockClass.js`** — `resolveHandlesWithBlockClass(handles, withModifiers, blockClass)` applies missing modifiers via `withModifiers`, skipping handles that already contain them (avoids `--foo--foo` when extension context already applied the class on standalone blocks).
+
+2. **`InfoCard`** — destructures `blockClass`; resolves handles before rendering; passes `blockClass` to `CallToAction`; exports `InfoCard.cssHandles = CSS_HANDLES`.
+
+3. **`CallToAction`** — receives `blockClass` and resolves handles the same way.
+
+4. **`InfoCardList`** — accepts `blockClass` on list props; passes it to `getInfoCardsAsJSXList(infoCards, blockClass)`; exposes `blockClass` in Site Editor schema.
+
+5. **`store/contentSchemas.json`** — removed `blockClass` from per-item `InfoCard` definition; added `InfoCardList` definition with list-level `blockClass` + `infoCards`.
+
+6. **`store/interfaces.json`** — `list-context.info-card-list` content `$ref` → `#/definitions/InfoCardList`.
+
+**`blockClass` placement (theme `blocks.json`):**
+
+```json
+{
+  "info-card-custom#hero": {
+    "props": {
+      "blockClass": "hero-home",
+      "headline": "..."
+    }
+  },
+  "list-context.info-card-list#banners": {
+    "props": {
+      "blockClass": "home-banners",
+      "infoCards": [
+        { "headline": "Card 1", "imageUrl": "..." },
+        { "headline": "Card 2", "imageUrl": "..." }
+      ]
+    }
+  }
+}
+```
+
+**Theme CSS** (`styles/css/.../sunhouse.info-card-custom.css` or layout CSS when composed):
+
+```css
+.infoCardContainer--home-banners { /* all cards in the list */ }
+.infoCardHeadline--hero-home { /* single card only */ }
+```
+
+**Status:** ✅ Implemented — extended same day in §8 (array `blockClass`, per-item override, Rich Text handles)
+
+---
+
+### 8. `blockClass` Propagation — Slider + Rich Text Handles
+
+**Goal:** When `list-context.info-card-list` feeds cards into `slider-layout`, every CSS handle in the slide markup must expose the union of layout and info-card modifiers — same behavior merchants expect from native `info-card#banner-main`.
+
+**Problem (confirmed on dev1 — `sunhouse-io_live1` theme):**
+
+| Handle group | Before fix | Expected |
+| ------------ | ---------- | -------- |
+| Shell (`infoCardContainer`, `infoCardTextContainer`, `infoCardCallActionContainer`) | `--main-banner`, `--main-banner-home` ✅ | Same |
+| Rich Text (`container`, `wrapper`, `heading`, `paragraph`, `headingLevel1`, …) | Only `--banner`, `--banner-main` (slider) ❌ | Slider **+** info-card modifiers |
+
+**Root cause:** Info Cards inside `list-context` are rendered as React elements, not as IO blocks. Shell handles were already patched via `resolveHandlesWithBlockClass`, but `textMode: rich-text` used `vtex.rich-text` directly — its `useCssHandles` only inherited the **parent layout's** extension context (slider), not the info-card `blockClass`.
+
+**Solution:**
+
+1. **`InfoCardRichText`** — wrapper around `vtex.rich-text` that:
+   - resolves Rich Text handles in the slider's CSS namespace (`useCssHandles`)
+   - applies info-card `blockClass` modifiers via `resolveHandlesWithBlockClass`
+   - passes resolved classes to Rich Text through `useCustomClasses` + `classes` prop
+
+2. **`cssHandlesWithBlockClass.js`** — extended helpers:
+   - `normalizeBlockClass()` — accepts `string` or `string[]`
+   - `resolveBlockClass(listBlockClass, itemBlockClass)` — per-item overrides list-level
+   - `resolveHandlesWithBlockClass()` — applies only **missing** modifiers (avoids duplicate `--foo` classes)
+
+3. **`infoCardsAsList.js`** — uses `resolveBlockClass()` instead of discarding per-item `blockClass`
+
+**Files created:**
+
+| File | Purpose |
+| ---- | ------- |
+| `react/components/InfoCard/InfoCardRichText.js` | Rich Text wrapper with blockClass-aware CSS handles |
+
+**Files modified:**
+
+| File | Change |
+| ---- | ------ |
+| `react/modules/cssHandlesWithBlockClass.js` | Array `blockClass` support; `normalizeBlockClass`, `resolveBlockClass`; idempotent modifier application |
+| `react/modules/infoCardsAsList.js` | Per-item `blockClass` priority over list-level |
+| `react/components/InfoCard/index.js` | `RichText` → `InfoCardRichText`; `blockClass` propType `string \| string[]` |
+| `react/components/InfoCardList/index.js` | `blockClass` propType `string \| string[]` |
+
+**`blockClass` priority (runtime):**
+
+```
+1. blockClass from slider-layout child block     → e.g. ["banner", "banner-main"]
+2. blockClass from infoCards[i] (if set)         → overrides list-level for that card
+3. blockClass from list-context.info-card-list   → fallback, e.g. ["main-banner", "main-banner-home"]
+```
+
+Each modifier is applied individually (`--banner`, `--banner-main`, `--main-banner`, `--main-banner-home`). No chained modifiers like `--banner--main-banner`.
+
+**Expected DOM (example — `textMode: rich-text`):**
+
+```html
+<h1 class="sunhouse-slider-layout-0-x-heading
+           sunhouse-slider-layout-0-x-heading--banner
+           sunhouse-slider-layout-0-x-heading--banner-main
+           sunhouse-slider-layout-0-x-heading--main-banner
+           sunhouse-slider-layout-0-x-heading--main-banner-home">
+```
+
+**Theme reference (`blocks.json`):**
+
+```json
+{
+  "list-context.info-card-list#banner-main": {
+    "children": ["slider-layout#banner-main-slider"],
+    "props": {
+      "blockClass": ["main-banner", "main-banner-home"],
+      "infoCards": [ /* headline, subhead, bodyText, imageUrl, … */ ]
+    }
+  },
+  "slider-layout#banner-main-slider": {
+    "props": {
+      "blockClass": ["banner", "banner-main"]
+    }
+  }
+}
+```
+
+**Note on `textMode`:** Rich Text handles (`container`, `heading`, `paragraph`, …) only appear when `textMode` is `"rich-text"`. With the default `"html"`, text uses Info Card shell handles (`infoCardHeadline`, `infoCardSubhead`, `infoCardBodyText`), which were already receiving info-card modifiers before this fix.
+
+**Status:** ✅ Implemented — `vtex link` build succeeds on dev workspace
+
+---
+
 ## 📅 Date: 17/06/2026
 
 ### 🎯 Session Objectives
@@ -42,14 +231,14 @@ infoCards[] → getInfoCardsAsJSXList() → [<InfoCard />, ...]
 
 | Block | Purpose |
 | ----- | ------- |
-| `info-card-standalone` | Single Info Card |
+| `info-card-custom` | Single Info Card |
 | `list-context.info-card-list` | Array of Info Cards + optional layout `children` |
 
 **Comparison with native VTEX (pre-session):**
 
 | Aspect | `vtex.store-components` | `sunhouse.info-card-custom` |
 | ------ | ------------------------- | ----------------------------- |
-| Block name | `info-card` | `info-card-standalone` |
+| Block name | `info-card` | `info-card-custom` |
 | Scope | Full component collection | Info Card only |
 | `textMode` default | `html` | Was `rich-text` → **fixed to `html`** |
 | List/array support | Not built-in | `list-context.info-card-list` |
@@ -116,7 +305,7 @@ infoCards[] → getInfoCardsAsJSXList() → [<InfoCard />, ...]
 
 ```js
 const list = useListContext()?.list ?? []
-const infoCardListContent = getInfoCardsAsJSXList(infoCards)
+const infoCardListContent = getInfoCardsAsJSXList(infoCards, blockClass)
 const newListContextValue = list.concat(infoCardListContent)
 
 if (childArray.length === 0) {
@@ -142,7 +331,7 @@ return (
 
 ```json
 {
-  "info-card-standalone": {
+  "info-card-custom": {
     "component": "InfoCard",
     "content": {
       "$ref": "app:sunhouse.info-card-custom#/definitions/InfoCard"
@@ -153,17 +342,15 @@ return (
     "composition": "children",
     "allowed": "*",
     "content": {
-      "properties": {
-        "infoCards": {
-          "$ref": "app:sunhouse.info-card-custom#/definitions/InfoCards"
-        }
-      }
+      "$ref": "app:sunhouse.info-card-custom#/definitions/InfoCardList"
     }
   }
 }
 ```
 
-**`infoCards` array:** Each item accepts the same props as `info-card-standalone` (via `$ref` to `InfoCard` definition).
+**`infoCards` array:** Each item accepts the same props as `info-card-custom` (via `$ref` to `InfoCard` definition), **except** list-level `blockClass` is the default for every card. A per-item `blockClass` (optional) overrides the list value for that card only — see §7–§8 (18/06/2026).
+
+**`blockClass` on lists:** Declared on `list-context.info-card-list` props; passed to each `<InfoCard />` and applied to all CSS handles — shell handles, `CallToAction`, and (when `textMode: rich-text`) Rich Text handles via `InfoCardRichText`. Accepts `string` or `string[]`.
 
 **Status:** ✅ Implemented
 
@@ -238,7 +425,7 @@ return (
 
 ```json
 {
-  "info-card-standalone#exemplo-completo": {
+  "info-card-custom#exemplo-completo": {
     "props": {
       "blockClass": "info-card-exemplo",
       "htmlId": "info-card-hero",
@@ -271,6 +458,7 @@ return (
 {
   "list-context.info-card-list#lista-direta": {
     "props": {
+      "blockClass": "lista-direta",
       "infoCards": [
         { "headline": "Card 1", "imageUrl": "https://...", "callToActionMode": "button", "callToActionText": "VER", "callToActionUrl": "/1" },
         { "headline": "Card 2", "isFullModeStyle": true, "imageUrl": "https://...", "textPosition": "center" }
@@ -285,18 +473,24 @@ return (
 ```json
 {
   "list-context.info-card-list#com-layout": {
-    "children": [],
+    "children": ["slider-layout#demo"],
     "props": {
+      "blockClass": "com-layout",
       "infoCards": [
         { "headline": "Slide 1", "imageUrl": "https://..." },
         { "headline": "Slide 2", "imageUrl": "https://..." }
       ]
     }
+  },
+  "slider-layout#demo": {
+    "props": {
+      "itemsPerPage": { "desktop": 1, "tablet": 1, "phone": 1 }
+    }
   }
 }
 ```
 
-> Replace `"children": []` with the desired layout block (e.g. `slider-layout#demo`). Theme must declare the layout app dependency (e.g. `vtex.slider-layout`).
+> Theme must declare the layout app dependency (e.g. `vtex.slider-layout` or `sunhouse.slider-layout`).
 
 **Status:** ✅ Documented — user confirmed working via `vtex link`
 
@@ -310,7 +504,7 @@ Props supported by the React component (some only via `blocks.json`, not Site Ed
 
 | Prop | Type | Default | Site Editor |
 | ---- | ---- | ------- | ----------- |
-| `blockClass` | string | — | ✅ |
+| `blockClass` | `string` \| `string[]` | — | ✅ |
 | `htmlId` | string | — | ❌ |
 | `isFullModeStyle` | boolean | `false` | ✅ |
 | `textMode` | `html` \| `rich-text` | `html` | ✅ |
@@ -337,7 +531,15 @@ Same as native `vtex.store-components` InfoCard:
 
 `infoCardContainer`, `infoCardTextContainer`, `infoCardHeadline`, `infoCardSubhead`, `infoCardBodyText`, `infoCardImageContainer`, `infoCardImage`, `infoCardImageLinkWrapper`, `infoCardCallActionContainer`, `infoCardCallActionText`
 
-Custom styles via theme: `styles/css/sunhouse.info-card-custom.css` (requires `styles` builder — not yet added; see Pending).
+When `textMode` is `"rich-text"` and the card is inside a layout block (e.g. `slider-layout`), text fields also expose Rich Text handles from the **layout app's CSS namespace** (e.g. `sunhouse-slider-layout-0-x-heading`), with both layout and info-card `blockClass` modifiers applied.
+
+Custom styles via theme: `styles/css/sunhouse.info-card-custom.css` (requires `styles` builder — not yet added; see Pending). For list + slider composition, theme CSS typically targets the layout app's CSS file (e.g. `sunhouse.slider-layout.css`).
+
+### `blockClass` in list-context + layout composition
+
+Info Cards pushed via `ListContextProvider` are React elements, not IO block instances. The app manually applies `blockClass` modifiers through `resolveHandlesWithBlockClass` so theme selectors like `.infoCardContainer--main-banner-home` and `.heading--main-banner-home` work without remapping.
+
+Helper module: `react/modules/cssHandlesWithBlockClass.js`
 
 ### Dependencies (Lean Set)
 
@@ -373,6 +575,9 @@ When `true`: image becomes CSS background; `textAlignment` is ignored (uses `tex
 | 1 | `textMode` default differed from VTEX native | Fork inherited `rich-text` as default in component + contentSchemas | Aligned all defaults to `html` | ✅ |
 | 2 | Locale parity warnings on `vtex link` | New i18n keys missing in several `messages/*.json` files | Added missing keys; later consolidated in §6 | ✅ |
 | 3 | `React builder could not extract messages` | ~207 fork messages in bundle; dynamic string IDs in schemas | Trimmed to 49 keys + `editorMessages.js` with `defineMessages` | ✅ |
+| 4 | `blockClass` had no effect in storefront | Prop in schema but not wired to `useCssHandles`; list items lack IO block context | `cssHandlesWithBlockClass.js` + list-level `blockClass` inheritance (§7) | ✅ |
+| 5 | Rich Text handles missing info-card `blockClass` inside slider | `vtex.rich-text` only inherited slider extension context; info-card `blockClass` not forwarded | `InfoCardRichText` wrapper + array `blockClass` support in `cssHandlesWithBlockClass.js` (§8) | ✅ |
+| 6 | Block name `info-card-standalone` inconsistent with app id | Initial export name before rename | Renamed to `info-card-custom` (§6) | ✅ |
 
 `vtex link` succeeds without i18n warnings after §6.
 
@@ -388,20 +593,30 @@ Use after `vtex link` with theme dependency `sunhouse.info-card-custom`.
 - [x] `vtex link` completes without builder errors
 - [x] `vtex link` completes without i18n warnings (locale parity + static message extraction)
 
-### `info-card-standalone`
+### `info-card-custom`
 
 - [x] Single card renders with headline, image, CTA
+- [x] Block registered as `info-card-custom` (not `info-card-standalone`)
+- [x] `blockClass` on single card generates `--{blockClass}` modifiers on CSS handles
 - [x] `textMode: html` default applies when prop omitted
 - [x] `isFullModeStyle: true` renders background image layout
 - [x] `callToActionMode: none` hides CTA
 
 ### `list-context.info-card-list`
 
+- [x] List-level `blockClass` inherited by all cards without repeating per `infoCards[]` item
 - [x] Multiple cards in `infoCards` render sequentially without `children`
-- [ ] Cards render inside `slider-layout` when declared as `children` (requires `vtex.slider-layout` in theme)
+- [x] Cards render inside `slider-layout` when declared as `children` (requires `vtex.slider-layout` in theme)
 - [ ] Responsive layout children (`responsive-layout.desktop#…`) consume list correctly
 - [ ] Site Editor: **+ ADICIONAR** on Info Cards array; per-item props editable
 - [ ] Saving/reopening list block preserves card order and values
+
+### `blockClass` + slider (18/06/2026)
+
+- [ ] Shell handles (`infoCardContainer`, `infoCardTextContainer`, `infoCardCallActionContainer`) show list `blockClass` modifiers inside slider
+- [ ] Rich Text handles (`container`, `wrapper`, `heading`, `paragraph`) show **both** slider and info-card modifiers when `textMode: rich-text`
+- [ ] Selectors like `.heading--main-banner-home` work in theme `sunhouse.slider-layout.css`
+- [ ] Multiple `blockClass` values (`["main-banner", "main-banner-home"]`) each generate separate `--{value}` modifiers
 
 ### Site Editor vs. blocks.json
 
@@ -446,14 +661,16 @@ Use after `vtex link` with theme dependency `sunhouse.info-card-custom`.
 | ------ | ----- |
 | Starting point | `vtex.store-components` InfoCard fork (v3.178.5 codebase) |
 | Final scope | Standalone Info Card app + list-context wrapper |
-| New core files | `InfoCardList`, `infoCardsAsList.js`, `vtex.list-context` typings, `editorMessages.js` |
-| Blocks exported | `info-card-standalone`, `list-context.info-card-list` |
+| New core files | `InfoCardList`, `infoCardsAsList.js`, `InfoCardRichText.js`, `cssHandlesWithBlockClass.js`, `vtex.list-context` typings, `editorMessages.js` |
+| Blocks exported | `info-card-custom`, `list-context.info-card-list` |
 | Alignment fixes | 1 (`textMode` default) |
+| Block rename | `info-card-standalone` → `info-card-custom` |
+| CSS handle fixes | 2 (`blockClass` foundation §7; Rich Text + slider propagation §8) |
 | i18n cleanup | 207 → 49 message keys; `defineMessages` for static extraction |
 | New dependency | `vtex.list-context@0.x` |
 | Build blockers | 0 |
 | Runtime blockers | 0 |
-| QA status | ✅ Basic `vtex link` + single/list render + i18n warnings cleared; slider/responsive QA pending |
+| QA status | ✅ Basic `vtex link` + single/list render + slider blockClass fix; full slider/responsive QA pending |
 
 ---
 
@@ -464,4 +681,5 @@ Use after `vtex link` with theme dependency `sunhouse.info-card-custom`.
 - [VTEX list-context](https://github.com/vtex-apps/list-context) — list composition provider
 - [VTEX Slider Layout](https://developers.vtex.com/docs/apps/vtex.slider-layout) — typical child block for list-context sliders
 - [VTEX IO — Using CSS handles](https://developers.vtex.com/docs/guides/vtex-io-documentation-using-css-handles-for-store-customization)
+- [vtex.css-handles](https://github.com/vtex-apps/css-handles) — `useCssHandles`, `withModifiers`, extension `blockClass` resolution
 - Upstream source: [vtex-apps/store-components — InfoCard](https://github.com/vtex-apps/store-components/tree/master/react/components/InfoCard)

@@ -1,5 +1,5 @@
 {
-  "info-card-standalone": {
+  "info-card-custom": {
     "component": "InfoCard",
     "content": {
       "$ref": "app:sunhouse.info-card-custom#/definitions/InfoCard"
@@ -10,11 +10,7 @@
     "composition": "children",
     "allowed": "*",
     "content": {
-      "properties": {
-        "infoCards": {
-          "$ref": "app:sunhouse.info-card-custom#/definitions/InfoCards"
-        }
-      }
+      "$ref": "app:sunhouse.info-card-custom#/definitions/InfoCardList"
     }
   }
 }

@@ -1,6 +1,6 @@
 import classNames from 'classnames'
-import PropTypes, { bool, string, oneOf } from 'prop-types'
-import React, { memo } from 'react'
+import PropTypes, { bool, string, oneOf, oneOfType, arrayOf } from 'prop-types'
+import React, { memo, useMemo } from 'react'
 import { values } from 'ramda'
 import { injectIntl } from 'react-intl'
 import {
@@ -9,9 +9,8 @@ import {
 } from 'vtex.render-runtime'
 import { formatIOMessage } from 'vtex.native-types'
 import { useCssHandles } from 'vtex.css-handles'
-import RichText from 'vtex.rich-text/index'
-
 import CallToAction from './CallToAction'
+import InfoCardRichText from './InfoCardRichText'
 import LinkWrapper from './LinkWrapper'
 import {
   textPositionTypes,
@@ -23,6 +22,7 @@ import {
 } from './SchemaTypes'
 import { SanitizedHTML } from '../SanitizedHTML.js'
 import editorMessages from '../../messages/editorMessages'
+import { resolveHandlesWithBlockClass } from '../../modules/cssHandlesWithBlockClass'
 
 const ALLOWED_TAGS = ['p', 'span', 'a', 'div', 'br']
 const ALLOWED_ATTRS = {
@@ -81,6 +81,7 @@ const CSS_HANDLES = [
 ]
 
 const InfoCard = ({
+  blockClass,
   isFullModeStyle,
   headline,
   subhead,
@@ -108,7 +109,12 @@ const InfoCard = ({
 
   const { lazyLoad } = useExperimentalLazyImagesContext()
 
-  const { handles } = useCssHandles(CSS_HANDLES)
+  const { handles: baseHandles, withModifiers } = useCssHandles(CSS_HANDLES)
+  const handles = useMemo(
+    () =>
+      resolveHandlesWithBlockClass(baseHandles, withModifiers, blockClass),
+    [baseHandles, withModifiers, blockClass]
+  )
   const paddingClass =
     textPosition === textPostionValues.LEFT ? 'pr4-ns' : 'pl4-ns'
 
@@ -201,7 +207,11 @@ const InfoCard = ({
                 />
               </div>
             ) : (
-              <RichText className={headlineClasses} text={headline} />
+              <InfoCardRichText
+                blockClass={blockClass}
+                className={headlineClasses}
+                text={headline}
+              />
             ))}
           {subhead &&
             (textMode === 'html' ? (
@@ -213,7 +223,11 @@ const InfoCard = ({
                 />
               </div>
             ) : (
-              <RichText className={subheadClasses} text={subhead} />
+              <InfoCardRichText
+                blockClass={blockClass}
+                className={subheadClasses}
+                text={subhead}
+              />
             ))}
           {bodyText &&
             (textMode === 'html' ? (
@@ -225,13 +239,18 @@ const InfoCard = ({
                 />
               </div>
             ) : (
-              <RichText className={bodyTextClasses} text={bodyText} />
+              <InfoCardRichText
+                blockClass={blockClass}
+                className={bodyTextClasses}
+                text={bodyText}
+              />
             ))}
           <CallToAction
             mode={callToActionMode}
             text={formatIOMessage({ id: callToActionText, intl })}
             url={formatIOMessage({ id: callToActionUrl, intl })}
             linkTarget={callToActionLinkTarget}
+            blockClass={blockClass}
           />
         </div>
         {!isFullModeStyle && (
@@ -267,7 +286,7 @@ const InfoCard = ({
 const MemoizedInfoCard = memo(injectIntl(InfoCard))
 
 MemoizedInfoCard.propTypes = {
-  blockClass: string,
+  blockClass: oneOfType([string, arrayOf(string)]),
   isFullModeStyle: bool,
   textPosition: oneOf(getEnumValues(textPositionTypes)),
   headline: string,
@@ -371,5 +390,7 @@ MemoizedInfoCard.schema = {
     },
   },
 }
+
+MemoizedInfoCard.cssHandles = CSS_HANDLES
 
 export default MemoizedInfoCard

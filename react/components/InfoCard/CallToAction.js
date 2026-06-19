@@ -1,16 +1,22 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { Link } from 'vtex.render-runtime'
 import { useCssHandles } from 'vtex.css-handles'
 
 import { callActionValues } from './SchemaTypes'
+import { resolveHandlesWithBlockClass } from '../../modules/cssHandlesWithBlockClass'
 
 const CSS_HANDLES = ['infoCardCallActionContainer', 'infoCardCallActionText']
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 const noop = () => {}
 
-const CallToAction = ({ mode, text, url, linkTarget }) => {
-  const { handles } = useCssHandles(CSS_HANDLES)
+const CallToAction = ({ mode, text, url, linkTarget, blockClass }) => {
+  const { handles: baseHandles, withModifiers } = useCssHandles(CSS_HANDLES)
+  const handles = useMemo(
+    () =>
+      resolveHandlesWithBlockClass(baseHandles, withModifiers, blockClass),
+    [baseHandles, withModifiers, blockClass]
+  )
 
   if (mode === callActionValues.NONE) {
     return null

@@ -14,8 +14,10 @@ For implementation history, QA status, and pending work, see [DEVELOPMENT_LOG.md
 
 | Block | Description |
 | ----- | ----------- |
-| `info-card-standalone` | Single Info Card with text, image, and optional call-to-action |
+| `info-card-custom` | Single Info Card with text, image, and optional call-to-action |
 | `list-context.info-card-list` | Array of Info Cards (`infoCards` prop) with optional `children` for layout composition (e.g. `slider-layout`) |
+
+> **Migration:** If upgrading from an earlier dev build that used `info-card-standalone`, rename the block to `info-card-custom` in theme `blocks.json` and templates.
 
 ---
 
@@ -33,15 +35,30 @@ Add the app to your store theme `manifest.json`:
 }
 ```
 
-If you use `list-context.info-card-list` with a slider, also declare the layout app (e.g. `vtex.slider-layout`).
+If you use `list-context.info-card-list` with a slider, also declare the layout app (e.g. `vtex.slider-layout` or your custom slider app).
 
-### 2. Single Info Card
+### 2. Register blocks and add to a template
 
-Add `info-card-standalone` to the desired template and configure its props:
+Define blocks in `store/blocks.json` (or split files) and reference them from a template, e.g. `store/blocks/home.json`:
 
 ```json
 {
-  "info-card-standalone#example": {
+  "store.home": {
+    "blocks": [
+      "info-card-custom#example",
+      "list-context.info-card-list#home-banners"
+    ]
+  }
+}
+```
+
+### 3. Single Info Card
+
+Add `info-card-custom` to the desired template and configure its props:
+
+```json
+{
+  "info-card-custom#example": {
     "props": {
       "blockClass": "info-card-example",
       "htmlId": "info-card-hero",
@@ -68,7 +85,7 @@ Add `info-card-standalone` to the desired template and configure its props:
 }
 ```
 
-### 3. Info Card list (direct render)
+### 4. Info Card list (direct render)
 
 When `children` is omitted, all items in `infoCards` are rendered sequentially on the page:
 
@@ -76,6 +93,7 @@ When `children` is omitted, all items in `infoCards` are rendered sequentially o
 {
   "list-context.info-card-list#home-banners": {
     "props": {
+      "blockClass": "home-banners",
       "infoCards": [
         {
           "headline": "Card 1",
@@ -99,7 +117,7 @@ When `children` is omitted, all items in `infoCards` are rendered sequentially o
 }
 ```
 
-### 4. Info Card list with layout children
+### 5. Info Card list with layout children
 
 When `children` is declared, the list is passed to the child block via `vtex.list-context` (e.g. one card per slide):
 
@@ -108,6 +126,7 @@ When `children` is declared, the list is passed to the child block via `vtex.lis
   "list-context.info-card-list#slider": {
     "children": ["slider-layout#info-cards"],
     "props": {
+      "blockClass": "info-cards-slider",
       "infoCards": [
         {
           "headline": "Slide 1",
@@ -137,17 +156,52 @@ When `children` is declared, the list is passed to the child block via `vtex.lis
 }
 ```
 
-Each object inside `infoCards` accepts the same props as `info-card-standalone`.
+**Home banner pattern (list + slider with separate `blockClass` values):**
+
+Use list-level `blockClass` for info-card styling and slider `blockClass` for layout styling. Both sets of modifiers appear on each slide's CSS handles:
+
+```json
+{
+  "list-context.info-card-list#banner-main": {
+    "children": ["slider-layout#banner-main-slider"],
+    "props": {
+      "blockClass": ["main-banner", "main-banner-home"],
+      "infoCards": [
+        {
+          "textMode": "rich-text",
+          "headline": "# Summer Sale",
+          "subhead": "Up to 50% off",
+          "bodyText": "Shop now",
+          "isFullModeStyle": true,
+          "imageUrl": "https://storecomponents.vteximg.com.br/arquivos/banner-infocard2.png",
+          "textPosition": "center"
+        }
+      ]
+    }
+  },
+  "slider-layout#banner-main-slider": {
+    "props": {
+      "blockClass": ["banner", "banner-main"],
+      "itemsPerPage": { "desktop": 1, "tablet": 1, "phone": 1 },
+      "infinite": true
+    }
+  }
+}
+```
+
+Each object inside `infoCards` accepts the same content props as `info-card-custom` (headline, image, CTA, etc.). For styling, declare `blockClass` **once on the list** — every card inherits it. An optional per-item `blockClass` overrides the list value for that card only.
 
 ---
 
 ## Props
 
-Applies to `info-card-standalone` and to each item in `list-context.info-card-list` → `infoCards`.
+### `info-card-custom` props
+
+Applies to the single-card block and to each item in `list-context.info-card-list` → `infoCards` (content fields only; see list props for `blockClass`).
 
 | Prop name | Type | Description | Default value | Site Editor |
 | --------- | ---- | ----------- | ------------- | ----------- |
-| `blockClass` | `string` | Extra class name for custom styling | — | ✅ |
+| `blockClass` | `string` \| `string[]` | Extra class name(s) for custom styling. On **single cards**, set here. On **lists**, prefer the list-level prop (below). Multiple values generate separate modifiers (e.g. `--main-banner`, `--main-banner-home`) | — | ✅ |
 | `htmlId` | `string` | ID of the container element | — | ❌ |
 | `isFullModeStyle` | `boolean` | If `true`, image is used as background and text is displayed over it | `false` | ✅ |
 | `textMode` | `TextModeEnum` | How `headline`, `subhead`, and `bodyText` are processed | `"html"` | ✅ |
@@ -172,10 +226,11 @@ Props marked ❌ work via `blocks.json` but are not exposed in the Site Editor y
 
 ### `list-context.info-card-list` props
 
-| Prop name | Type | Description |
-| --------- | ---- | ----------- |
-| `infoCards` | `array` | Array of Info Card configuration objects (same props as above) |
-| `children` | blocks | Optional. Layout blocks that consume the list via `vtex.list-context`. When omitted, cards render directly |
+| Prop name | Type | Description | Site Editor |
+| --------- | ---- | ----------- | ----------- |
+| `blockClass` | `string` \| `string[]` | CSS class(es) applied to **every** card in the list (generates handles like `.infoCardContainer--{blockClass}`). Per-item `blockClass` in `infoCards[]` overrides this for that card | ✅ |
+| `infoCards` | `array` | Array of Info Card configuration objects (same props as `info-card-custom`) | ✅ |
+| `children` | blocks | Optional. Layout blocks that consume the list via `vtex.list-context`. When omitted, cards render directly | — |
 
 ---
 
@@ -219,6 +274,8 @@ Same values supported by HTML5 anchor tags. See [MDN](https://developer.mozilla.
 
 To apply CSS customizations, see the [Using CSS handles for store customization](https://developers.vtex.com/docs/guides/vtex-io-documentation-using-css-handles-for-store-customization) guide.
 
+### Info Card handles
+
 | CSS Handles |
 | ----------- |
 | `infoCardCallActionContainer` |
@@ -232,16 +289,41 @@ To apply CSS customizations, see the [Using CSS handles for store customization]
 | `infoCardBodyText` |
 | `infoCardTextContainer` |
 
+Use `blockClass` to target specific instances: `.infoCardContainer--my-banner`.
+
+**Why list-level `blockClass`?** Items inside `infoCards[]` are rendered as React elements, not as separate IO block instances — they do not get automatic `blockClass` from the theme block id. Declaring `blockClass` on `list-context.info-card-list` applies the same modifiers to every card's CSS handles (shell, CTA, and Rich Text when `textMode: rich-text`). See [DEVELOPMENT_LOG.md §7](./DEVELOPMENT_LOG.md).
+
+### List + slider composition
+
+When `list-context.info-card-list` feeds cards into a layout block (e.g. `slider-layout`), CSS handles use the **layout app's namespace** (e.g. `sunhouse-slider-layout-0-x-infoCardContainer`). Each handle receives modifiers from **both** the layout's `blockClass` and the list's `blockClass`:
+
+| Source | Example `blockClass` | Generated modifiers |
+| ------ | -------------------- | ------------------- |
+| `slider-layout` | `["banner", "banner-main"]` | `--banner`, `--banner-main` |
+| `list-context.info-card-list` | `["main-banner", "main-banner-home"]` | `--main-banner`, `--main-banner-home` |
+
+Example selector in theme CSS (`styles/css/.../sunhouse.slider-layout.css`):
+
+```css
+.heading--main-banner-home {
+  /* styles ported from vtex.store-components.css */
+}
+```
+
+When `textMode` is `"rich-text"`, text fields also expose Rich Text handles (`container`, `wrapper`, `heading`, `paragraph`, `headingLevel1`, …) with the same combined modifiers. With `textMode: "html"` (default), text uses Info Card shell handles (`infoCardHeadline`, `infoCardSubhead`, `infoCardBodyText`).
+
 ---
 
 ## Differences from `vtex.store-components`
 
 | Aspect | `vtex.store-components` | `sunhouse.info-card-custom` |
 | ------ | ------------------------- | ----------------------------- |
-| Block name | `info-card` | `info-card-standalone` |
+| Block name | `info-card` | `info-card-custom` |
 | Scope | ~20 store blocks | Info Card only |
 | List of cards | Not built-in | `list-context.info-card-list` |
 | `textMode` default | `html` | `html` (aligned) |
+| `blockClass` on lists | N/A | List-level prop; inherited by all `infoCards[]` items |
+| `blockClass` in slider | Native block context applies automatically | Manual propagation via `cssHandlesWithBlockClass` + `InfoCardRichText` |
 
 ---
 
