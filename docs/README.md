@@ -268,7 +268,7 @@ Same values supported by HTML5 anchor tags. See [MDN](https://developer.mozilla.
 
 ### `TextModeEnum` possible values
 
-| Enum name | Enum value | Description |
+| Enum name | Enum value  | Description |
 | --------- | ----------- | ----------- |
 | HTML | `html` | Uses sanitized HTML for `headline`, `subhead`, and `bodyText` |
 | Rich Text | `rich-text` | Uses markdown via [`vtex.rich-text`](https://github.com/vtex-apps/rich-text) |
@@ -300,16 +300,26 @@ Use `blockClass` to target specific instances: `.infoCardContainer--my-banner`.
 
 ### List + slider composition
 
-When `list-context.info-card-list` feeds cards into a layout block (e.g. `slider-layout`), CSS handles use the **layout app's namespace** (e.g. `sunhouse-slider-layout-0-x-infoCardContainer`). Each handle receives modifiers from **both** the layout's `blockClass` and the list's `blockClass`:
+When `list-context.info-card-list` feeds cards into a layout block (e.g. `slider-layout`), CSS handles use the **layout app's namespace** (e.g. `sunhouse-slider-layout-0-x-infoCardContainer`). Each handle receives modifiers from **both** the layout's `blockClass` and the list's `blockClass` — so a single handle can carry modifiers from two different sources at once:
+
+```
+.infoCardContainer--banner            ← from slider-layout's blockClass
+.infoCardContainer--banner-main       ← from slider-layout's blockClass
+.infoCardContainer--main-banner       ← from the list's blockClass
+.infoCardContainer--main-banner-home  ← from the list's blockClass
+```
+
+In other words, given:
 
 | Source | Example `blockClass` | Generated modifiers |
-| ------ | -------------------- | ------------------- |
+| ------ | --------------------- | -------------------- |
 | `slider-layout` | `["banner", "banner-main"]` | `--banner`, `--banner-main` |
 | `list-context.info-card-list` | `["main-banner", "main-banner-home"]` | `--main-banner`, `--main-banner-home` |
 
-Example selector in theme CSS (`styles/css/.../sunhouse.slider-layout.css`):
+...every card's handle ends up carrying all four modifiers, letting theme CSS target either the layout or the content independently:
 
 ```css
+/* styles/css/.../sunhouse.slider-layout.css */
 .heading--main-banner-home {
   /* styles ported from vtex.store-components.css */
 }
