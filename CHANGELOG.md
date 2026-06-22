@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-22
+
 ## [1.0.0] - 2026-06-22
 
 First standalone release of `sunhouse.info-card-custom`, extracted from `vtex.store-components` InfoCard (fork baseline v3.178.5).
