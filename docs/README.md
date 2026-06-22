@@ -2,7 +2,12 @@
 
 Standalone VTEX IO app based on the [`info-card`](https://developers.vtex.com/docs/apps/vtex.store-components) block from `vtex.store-components`. It ships the Info Card as an independent app under the `sunhouse` vendor namespace, with a list wrapper compatible with VTEX `list-context` composition (same pattern as [`vtex.store-image`](https://developers.vtex.com/docs/apps/vtex.store-image)).
 
-![image](https://cdn.jsdelivr.net/gh/vtexdocs/dev-portal-content@main/images/vtex-store-components-infocard-0.png)
+<!-- ![image](/assets/images/vtex-io-info-card-custom-01.gif) -->
+<br/>
+<p align="center">
+  <img src="/assets/images/vtex-io-info-card-custom-01.gif" alt="image">
+</p>
+<br/>
 
 **App identity:** `sunhouse.info-card-custom`
 
