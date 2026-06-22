@@ -178,8 +178,28 @@ Use list-level `blockClass` for info-card styling and slider `blockClass` for la
           "subhead": "Up to 50% off",
           "bodyText": "Shop now",
           "isFullModeStyle": true,
+          "hasBackdrop": true,
           "imageUrl": "https://storecomponents.vteximg.com.br/arquivos/banner-infocard2.png",
           "textPosition": "center"
+        },
+        {
+          "textMode": "rich-text",
+          "headline": "# New Arrivals",
+          "subhead": "Fresh styles",
+          "isFullModeStyle": true,
+          "hasBackdrop": false,
+          "imageUrl": "https://storecomponents.vteximg.com.br/arquivos/banner-infocard2.png",
+          "textPosition": "center"
+        },
+        {
+          "textMode": "rich-text",
+          "headline": "# Christmas",
+          "subhead": "Coming soon",
+          "isFullModeStyle": true,
+          "hasBackdrop": true,
+          "imageUrl": "https://storecomponents.vteximg.com.br/arquivos/banner-infocard2.png",
+          "textPosition": "center",
+          "isHidden": true
         }
       ]
     }
@@ -194,7 +214,7 @@ Use list-level `blockClass` for info-card styling and slider `blockClass` for la
 }
 ```
 
-Each object inside `infoCards` accepts the same content props as `info-card-custom` (headline, image, CTA, etc.). For styling, declare `blockClass` **once on the list** — every card inherits it. An optional per-item `blockClass` overrides the list value for that card only.
+Each object inside `infoCards` accepts the same content props as `info-card-custom` (headline, image, CTA, etc.). For styling, declare `blockClass` **once on the list** — every card inherits it. An optional per-item `blockClass` overrides the list value for that card only. Use `hasBackdrop` per item to toggle the dark overlay on full-mode banners independently. Use `isHidden` per item to keep a banner's configuration in the array while skipping DOM render (ideal for seasonal banners).
 
 ---
 
@@ -209,6 +229,8 @@ Applies to the single-card block and to each item in `list-context.info-card-lis
 | `blockClass` | `string` \| `string[]` | Extra class name(s) for custom styling. On **single cards**, set here. On **lists**, prefer the list-level prop (below). Multiple values generate separate modifiers (e.g. `--main-banner`, `--main-banner-home`) | — | ✅ |
 | `htmlId` | `string` | ID of the container element | — | ❌ |
 | `isFullModeStyle` | `boolean` | If `true`, image is used as background and text is displayed over it | `false` | ✅ |
+| `hasBackdrop` | `boolean` | Adds `--backdrop` modifier on `infoCardContainer` for theme overlay styling. Only applies when `isFullModeStyle` is `true` | `false` | ✅ |
+| `isHidden` | `boolean` | When `true`, the banner is not rendered in the DOM. Useful for seasonal banners without removing configuration | `false` | ✅ |
 | `textMode` | `TextModeEnum` | How `headline`, `subhead`, and `bodyText` are processed | `"html"` | ✅ |
 | `headline` | `string` | Headline of the Info Card | `""` | ✅ |
 | `subhead` | `string` | Text underneath the headline | `""` | ✅ |
@@ -217,17 +239,17 @@ Applies to the single-card block and to each item in `list-context.info-card-lis
 | `textAlignment` | `TextAlignmentEnum` | Text alignment inside the component. Ignored when `isFullModeStyle` is `true` | `"left"` | ✅ |
 | `imageUrl` | `string` | Image URL for desktop | `""` | ✅ |
 | `mobileImageUrl` | `string` | Image URL for mobile. Falls back to `imageUrl` when empty | `""` | ✅ |
-| `imageAltText` | `string` | Alternative text for the image (SEO) | `""` | ❌ |
+| `imageAltText` | `string` | Alternative text for the `<img>` (SEO). **Half mode only** — no effect in full-mode | `""` | ❌ |
 | `imageActionUrl` | `string` | URL when the image is clicked | `""` | ✅ |
 | `linkTarget` | `LinkTargetEnum` | Target when the Info Card wrapper link is used | `"_self"` | ❌ |
 | `callToActionMode` | `CallToActionEnum` | CTA display mode | `"button"` | ✅ |
 | `callToActionText` | `string` | CTA label | `""` | ✅ |
 | `callToActionUrl` | `string` | CTA URL | `""` | ✅ |
 | `callToActionLinkTarget` | `LinkTargetEnum` | Target for the CTA link | `"_self"` | ⚠️ `_self` / `_blank` only |
-| `fetchpriority` | `string` | Image fetch priority hint: `high`, `low`, or `auto` | `"auto"` | ❌ |
-| `preload` | `boolean` | Preloads the image, prioritizing display over other assets | `false` | ❌ |
+| `fetchpriority` | `string` | Image fetch priority on the `<img>` tag: `high`, `low`, or `auto`. **Half mode only** — no effect in full-mode (background-image) | `"auto"` | ❌ |
+| `preload` | `boolean` | Sets `data-vtex-preload` on the `<img>`. **Half mode only** — no effect in full-mode | `false` | ❌ |
 
-Props marked ❌ work via `blocks.json` but are not exposed in the Site Editor yet.
+Props marked ❌ work via `blocks.json` but are not exposed in the Site Editor. `imageAltText`, `fetchpriority`, and `preload` target the `<img>` element, which is not rendered when `isFullModeStyle` is `true`.
 
 ### `list-context.info-card-list` props
 
@@ -327,6 +349,71 @@ In other words, given:
 
 When `textMode` is `"rich-text"`, text fields also expose Rich Text handles (`container`, `wrapper`, `heading`, `paragraph`, `headingLevel1`, …) with the same combined modifiers. With `textMode: "html"` (default), text uses Info Card shell handles (`infoCardHeadline`, `infoCardSubhead`, `infoCardBodyText`).
 
+### Backdrop overlay (`hasBackdrop`)
+
+When `hasBackdrop` is `true` and `isFullModeStyle` is `true`, the app adds a `--backdrop` modifier on `infoCardContainer` only. The overlay appearance is defined in the **store theme** — the app does not ship CSS.
+
+```css
+/* styles/css/.../sunhouse.slider-layout.css */
+.infoCardContainer--backdrop {
+  position: relative;
+}
+
+.infoCardContainer--backdrop::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #000;
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.infoCardContainer--backdrop .infoCardTextContainer {
+  position: relative;
+  z-index: 1;
+}
+```
+
+Per-banner toggle in `infoCards[]`:
+
+```json
+{
+  "isFullModeStyle": true,
+  "hasBackdrop": true,
+  "headline": "Banner with overlay",
+  "imageUrl": "https://..."
+}
+```
+
+> Do not use list-level `blockClass` (e.g. `--main-banner-home::after`) for per-banner overlays — that modifier applies to every card in the list. Use `hasBackdrop` instead.
+
+### Seasonal banners (`isHidden`)
+
+When `isHidden` is `true`, the banner is **not rendered in the DOM** — no container, no image, no slider slide. The item stays in `infoCards[]` so merchants can toggle visibility in Site Editor without re-entering copy or media.
+
+```json
+{
+  "headline": "Christmas Sale",
+  "isFullModeStyle": true,
+  "imageUrl": "https://...",
+  "isHidden": true
+}
+```
+
+**How it works:**
+
+| Layer | Behavior |
+| ----- | -------- |
+| `infoCardsAsList.js` | Filters hidden items before building JSX (list + `slider-layout`) |
+| `InfoCard` (standalone) | Returns `null` when `isHidden` is `true` |
+| Default | `false` — backward compatible |
+
+> Prefer `isHidden` over CSS `display: none` — hidden banners do not load images and do not leave empty slides in the carousel.
+
 ---
 
 ## Differences from `vtex.store-components`
@@ -338,6 +425,8 @@ When `textMode` is `"rich-text"`, text fields also expose Rich Text handles (`co
 | List of cards | Not built-in | `list-context.info-card-list` |
 | `textMode` default | `html` | `html` (aligned) |
 | `blockClass` on lists | N/A | List-level prop; inherited by all `infoCards[]` items |
+| `hasBackdrop` | N/A | Per-banner overlay toggle; adds `--backdrop` on `infoCardContainer` (full mode only) |
+| `isHidden` | N/A | Per-banner visibility toggle; skips DOM render while keeping `infoCards[]` config |
 | `blockClass` in slider | Native block context applies automatically | Manual propagation via `cssHandlesWithBlockClass` + `InfoCardRichText` |
 
 ---

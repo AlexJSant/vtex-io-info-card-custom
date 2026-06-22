@@ -4,6 +4,232 @@ This document records the customizations, fixes, and improvements implemented in
 
 ---
 
+## 📅 Date: 22/06/2026
+
+### 🎯 Session Objectives
+
+- Add per-banner **backdrop overlay** toggle for full-mode banners (`hasBackdrop` prop)
+- Expose the prop in Site Editor and `contentSchemas.json`
+- Apply a dedicated CSS handle modifier (`--backdrop`) on `infoCardContainer` only when `hasBackdrop && isFullModeStyle`
+- Keep visual styling in the store theme (app controls behavior; theme owns the fixed overlay look)
+- Fix **Image action URL** (`imageActionUrl`) breaking the image when configured via Site Editor
+- Add per-banner **`isHidden`** toggle to skip DOM rendering while keeping configuration in `infoCards[]` (seasonal banners)
+- Fix **`fix-i18n-messages.js`** so schema keys referenced via `editorMessages.*` are not stripped from `editorMessages.js`
+
+---
+
+## ✅ Implemented Changes (22/06/2026)
+
+### 9. `hasBackdrop` — Per-Banner Backdrop Overlay (Full Mode Only)
+
+**Goal:** Let merchants enable or disable a dark overlay on background-image banners individually inside `infoCards[]`, without repeating custom `blockClass` names or affecting half-mode cards.
+
+**Design decisions:**
+
+| Aspect | Choice |
+| ------ | ------ |
+| Control surface | Boolean prop `hasBackdrop` (default `false`) on each Info Card |
+| Activation guard | Modifier applied only when `hasBackdrop && isFullModeStyle` |
+| CSS handle | `--backdrop` on `infoCardContainer` only (not on text, CTA, or Rich Text handles) |
+| Visual styling | Theme CSS targets `.infoCardContainer--backdrop::after` (fixed overlay; not configurable per banner) |
+| Per-item usage | Works via `infoCards[]` spread in `getInfoCardsAsJSXList` — no `InfoCardList` changes required |
+
+**Runtime behavior:**
+
+1. `resolveHandlesWithBlockClass` applies list/item `blockClass` modifiers as before.
+2. When backdrop is active, `withModifiers('infoCardContainer', ['backdrop'])` appends `--backdrop` to the resolved container handle (idempotent if already present).
+3. If `hasBackdrop` is `true` but `isFullModeStyle` is `false`, the prop is ignored — no modifier, no error.
+
+**Theme `blocks.json` example:**
+
+```json
+"infoCards": [
+  {
+    "headline": "Banner com overlay",
+    "isFullModeStyle": true,
+    "hasBackdrop": true,
+    "imageUrl": "https://..."
+  },
+  {
+    "headline": "Banner sem overlay",
+    "isFullModeStyle": true,
+    "hasBackdrop": false,
+    "imageUrl": "https://..."
+  }
+]
+```
+
+**Expected DOM (inside slider):**
+
+```html
+<div class="sunhouse-slider-layout-0-x-infoCardContainer
+            sunhouse-slider-layout-0-x-infoCardContainer--main-banner
+            sunhouse-slider-layout-0-x-infoCardContainer--main-banner-home
+            sunhouse-slider-layout-0-x-infoCardContainer--backdrop">
+```
+
+**Theme CSS** (store theme — layout app namespace, e.g. `sunhouse.slider-layout.css`):
+
+```css
+.infoCardContainer--backdrop {
+  position: relative;
+}
+
+.infoCardContainer--backdrop::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #000;
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.infoCardContainer--backdrop .infoCardTextContainer {
+  position: relative;
+  z-index: 1;
+}
+```
+
+**Files modified:**
+
+| File | Change |
+| ---- | ------ |
+| `react/components/InfoCard/index.js` | `hasBackdrop` prop; `infoCardContainerHandle` with `--backdrop` modifier; schema + defaultProps |
+| `store/contentSchemas.json` | `hasBackdrop` boolean on `InfoCard` definition |
+| `react/messages/editorMessages.js` | Site Editor labels for `hasBackdrop` |
+| `messages/*.json` | i18n keys `admin/editor.info-card.hasBackdrop.title` / `.description` (51 keys total) |
+| `docs/README.md` | Prop table, usage example, customization section |
+
+**Status:** ✅ Implemented — validated on dev workspace via `vtex link`
+
+---
+
+### 10. `imageActionUrl` — Site Editor URL Resolution & Image Link Layout
+
+**Goal:** Fix the **Image action URL** field (`imageActionUrl`) so merchants can turn the half-mode image into a clickable link via Site Editor without breaking image display or layout.
+
+**Problem observed:**
+
+- Filling **URL de ação da imagem** in Site Editor caused the image to break (collapse / disappear in the `w-50-ns` column).
+- Same root cause existed in native `vtex.store-components` InfoCard (inherited pattern).
+- `blocks.json` with a plain string URL was not the primary failure path; the bug surfaced with CMS **IOMessage** values from Site Editor.
+
+**Root causes:**
+
+| Issue | Detail |
+| ----- | ------ |
+| URL resolution | `formatIOMessage({ id: imageActionUrl, intl })` fails when Site Editor passes an IOMessage object `{ id, defaultMessage }` — `formatIOMessage` returns `''` because `id` is not a string |
+| Layout | Inner `LinkWrapper` around `<img>` rendered `<Link>` without `infoCardImageLinkWrapper` or width utilities; inline link broke flex layout when `imageActionUrl` was truthy |
+
+**Solution:**
+
+1. **`react/modules/formatIOUrl.js`** — resolves URL props from either a plain string (`blocks.json`) or an IOMessage descriptor (`Site Editor`), delegating to `formatIOMessage({ intl, ...descriptor })` when needed.
+2. **`InfoCard/index.js`** — use `formatIOUrl` for `imageActionUrl`, `imageUrl`, `mobileImageUrl`, and `callToActionUrl`; compute `resolvedImageActionUrl` once for both `LinkWrapper` instances.
+3. **Layout** — apply `infoCardImageLinkWrapper no-underline db w-100` on the inner image link; add `w-100` on `<img>` so the image keeps full width inside the link.
+
+**Files modified:**
+
+| File | Change |
+| ---- | ------ |
+| `react/modules/formatIOUrl.js` | New helper for CMS-compatible URL resolution |
+| `react/components/InfoCard/index.js` | `formatIOUrl` usage; inner `LinkWrapper` className; `w-100` on image; `propTypes` accept `string \| object` for URL fields |
+
+**Out of scope (known limitations):**
+
+- `linkTarget` still blocks.json-only (not in `contentSchemas.json`) — image link target defaults to `_self` in Site Editor.
+- Full-mode (`isFullModeStyle: true`) with `imageActionUrl` + CTA can still produce nested links (inherited from native InfoCard).
+
+**Status:** ✅ Implemented — validated on dev workspace via Site Editor (`vtex link`)
+
+---
+
+### 11. `isHidden` — Per-Banner Visibility Toggle (No DOM Render)
+
+**Goal:** Let merchants hide individual banners inside `infoCards[]` without deleting the array item — useful for seasonal campaigns where configuration (copy, images, CTAs) should be preserved and re-enabled later.
+
+**Design decisions:**
+
+| Aspect | Choice |
+| ------ | ------ |
+| Control surface | Boolean prop `isHidden` (default `false`) on each Info Card |
+| List behavior | Filter in `getInfoCardsAsJSXList` **before** JSX is built — hidden items never enter `ListContextProvider` or `slider-layout` |
+| Standalone block | `info-card-custom` returns `null` when `isHidden` is `true` (after hooks, respecting Rules of Hooks) |
+| vs CSS `display: none` | No DOM node, no image request, slider slide count matches visible banners only |
+
+**Runtime behavior:**
+
+1. `infoCardsAsList.js` filters `infoCards.filter(({ isHidden }) => !isHidden)` then maps survivors to `<InfoCard />`.
+2. `isHidden` is stripped from props spread so it is not passed to the rendered component in lists.
+3. Default `false` — existing stores and `blocks.json` entries behave unchanged.
+
+**Theme `blocks.json` example:**
+
+```json
+"infoCards": [
+  {
+    "headline": "Black Friday",
+    "isFullModeStyle": true,
+    "imageUrl": "https://...",
+    "isHidden": false
+  },
+  {
+    "headline": "Natal",
+    "isFullModeStyle": true,
+    "imageUrl": "https://...",
+    "isHidden": true
+  }
+]
+```
+
+**Edge case:** If every item in `infoCards[]` has `isHidden: true`, the list/slider renders empty — handle in the theme if needed (fallback block, conditional layout, etc.).
+
+**Files modified:**
+
+| File | Change |
+| ---- | ------ |
+| `react/modules/infoCardsAsList.js` | Filter hidden items before `.map()` |
+| `react/components/InfoCard/index.js` | `isHidden` prop; early `return null`; schema + defaultProps |
+| `store/contentSchemas.json` | `isHidden` boolean on `InfoCard` definition |
+| `react/messages/editorMessages.js` | Site Editor labels for `isHidden` |
+| `messages/*.json` | i18n keys `admin/editor.info-card.isHidden.title` / `.description` |
+| `docs/README.md` | Prop table, usage example, customization section |
+| `CHANGELOG.md` | `[Unreleased]` entry |
+
+**Status:** ✅ Implemented — validated on dev workspace via `vtex link` and Site Editor
+
+---
+
+### 12. `fix-i18n-messages.js` — Schema Key Preservation (Render Fix)
+
+**Goal:** Fix render errors (`Cannot read property 'id' of undefined`) introduced when running `node scripts/fix-i18n-messages.js` after adding `isHidden`.
+
+**Problem observed:**
+
+- The script regenerated `editorMessages.js` using only `admin/editor.*` strings found in a fixed set of source files.
+- Component schemas reference messages indirectly (`editorMessages.info_card_title.id`, `editorMessages.info_card_list_title.id`, etc.) without embedding the raw `admin/editor.*` string in those files.
+- Running the script removed ~10 required keys; `InfoCard.schema` and `InfoCardList.schema` crashed at runtime.
+
+**Solution:**
+
+1. Before overwriting, read existing `react/messages/editorMessages.js` and union all `id: 'admin/editor...'` values into the used-key set.
+2. Scan component sources for `editorMessages.(\w+)` references and resolve each to its `admin/editor.*` id via the existing editorMessages map.
+
+**Files modified:**
+
+| File | Change |
+| ---- | ------ |
+| `scripts/fix-i18n-messages.js` | Preserve existing editor message ids; resolve `editorMessages.*` refs from components |
+| `react/messages/editorMessages.js` | Restored full key set (53 keys) + `hasBackdrop` + `isHidden` |
+| `messages/*.json` | Restored full key set across locales |
+
+**Status:** ✅ Fixed — app renders correctly after `vtex link`
+
+---
+
 ## 📅 Date: 18/06/2026
 
 ### 🎯 Session Objectives
@@ -515,17 +741,23 @@ Props supported by the React component (some only via `blocks.json`, not Site Ed
 | `textAlignment` | `left` \| `center` \| `right` | `left` | ✅ |
 | `imageUrl` | string (URL) | `""` | ✅ |
 | `mobileImageUrl` | string (URL) | `""` | ✅ |
-| `imageAltText` | string | `""` | ❌ |
+| `imageAltText` | string | `""` | ❌ (half mode `<img>` only — blocks.json) |
 | `imageActionUrl` | string (URL) | `""` | ✅ |
 | `linkTarget` | `_self` \| `_blank` \| `_parent` \| `_top` | `_self` | ❌ |
 | `callToActionMode` | `none` \| `button` \| `link` | `button` | ✅ |
 | `callToActionText` | string | `""` | ✅ |
 | `callToActionUrl` | string (URL) | `""` | ✅ |
 | `callToActionLinkTarget` | `_self` \| `_blank` \| `_parent` \| `_top` | `_self` | ⚠️ Editor: `_self` / `_blank` only |
-| `fetchpriority` | `auto` \| `high` \| `low` | `auto` | ❌ |
-| `preload` | boolean | `false` | ❌ |
+| `fetchpriority` | `auto` \| `high` \| `low` | `auto` | ❌ (half mode `<img>` only — see note below) |
+| `preload` | boolean | `false` | ❌ (half mode `<img>` only) |
 
-### CSS Handles
+### Half mode vs. full mode — `<img>`-only props
+
+When `isFullModeStyle` is **`false`** (half mode), the image renders as an `<img>` inside `infoCardImageContainer`. Props `imageAltText`, `fetchpriority`, and `preload` apply to that element.
+
+When `isFullModeStyle` is **`true`** (full mode), the image is a CSS **`background-image`** on the container (or `data-bg` when lazy-load is active). **No `<img>` tag is rendered** — so `fetchpriority` and `preload` have no DOM target, and `imageAltText` is not emitted as `alt`. For full-mode banners, SEO/accessibility for the visual is typically handled via headline copy or future markup enhancements (backlog).
+
+---
 
 Same as native `vtex.store-components` InfoCard:
 
@@ -533,7 +765,7 @@ Same as native `vtex.store-components` InfoCard:
 
 When `textMode` is `"rich-text"` and the card is inside a layout block (e.g. `slider-layout`), text fields also expose Rich Text handles from the **layout app's CSS namespace** (e.g. `sunhouse-slider-layout-0-x-heading`), with both layout and info-card `blockClass` modifiers applied.
 
-Custom styles via theme: `styles/css/sunhouse.info-card-custom.css` (requires `styles` builder — not yet added; see Pending). For list + slider composition, theme CSS typically targets the layout app's CSS file (e.g. `sunhouse.slider-layout.css`).
+Custom styles via theme: `styles/css/sunhouse.info-card-custom.css` (requires `styles` builder — **deferred**; see Pending § *styles builder*). For list + slider composition, theme CSS typically targets the layout app's CSS file (e.g. `sunhouse.slider-layout.css`).
 
 ### `blockClass` in list-context + layout composition
 
@@ -553,14 +785,14 @@ vtex.css-handles, vtex.list-context, vtex.native-types, vtex.render-runtime, vte
 
 | Aspect | Detail |
 | ------ | ------ |
-| Locale files | 17 languages + `context.json` (inherited file set from fork; **content** trimmed to 49 keys each) |
+| Locale files | `en`, `pt`, `context.json` only (reduced from 17 fork locales; **content** trimmed to 53 keys each) |
 | Message scope | Site Editor labels for Info Card + Info Card List only — no storefront `store/*` strings (not used by this app) |
 | Static extraction | `react/messages/editorMessages.js` — all schema message IDs declared via `defineMessages` |
 | Regeneration | `node scripts/fix-i18n-messages.js` after adding keys to schemas |
 
 ### Intentionally Not Included (vs. Full Fork)
 
-The repo still contains artifacts from the original `vtex.store-components` fork (full CHANGELOG, unused typings). Only Info Card + Info Card List are actively maintained. Locale **files** were kept for parity with the fork; locale **keys** were trimmed to the standalone app scope (see §6).
+The repo was forked from `vtex.store-components`; fork-only artifacts (inherited CHANGELOG, product typings, extra locale files) were removed in v1.0.0 hygiene pass. Only Info Card + Info Card List are actively maintained.
 
 ### `isFullModeStyle` Behavior
 
@@ -578,12 +810,13 @@ When `true`: image becomes CSS background; `textAlignment` is ignored (uses `tex
 | 4 | `blockClass` had no effect in storefront | Prop in schema but not wired to `useCssHandles`; list items lack IO block context | `cssHandlesWithBlockClass.js` + list-level `blockClass` inheritance (§7) | ✅ |
 | 5 | Rich Text handles missing info-card `blockClass` inside slider | `vtex.rich-text` only inherited slider extension context; info-card `blockClass` not forwarded | `InfoCardRichText` wrapper + array `blockClass` support in `cssHandlesWithBlockClass.js` (§8) | ✅ |
 | 6 | Block name `info-card-standalone` inconsistent with app id | Initial export name before rename | Renamed to `info-card-custom` (§6) | ✅ |
+| 7 | Backdrop overlay required per-banner toggle, not list-wide `blockClass` | `--main-banner-home::after` in theme applied overlay to every banner | `hasBackdrop` prop + `--backdrop` modifier on `infoCardContainer` (§9) | ✅ |
 
 `vtex link` succeeds without i18n warnings after §6.
 
 ---
 
-## ✅ QA Checklist (17/06/2026)
+## ✅ QA Checklist (17/06/2026 — updated 22/06/2026)
 
 Use after `vtex link` with theme dependency `sunhouse.info-card-custom`.
 
@@ -600,6 +833,7 @@ Use after `vtex link` with theme dependency `sunhouse.info-card-custom`.
 - [x] `blockClass` on single card generates `--{blockClass}` modifiers on CSS handles
 - [x] `textMode: html` default applies when prop omitted
 - [x] `isFullModeStyle: true` renders background image layout
+- [x] `hasBackdrop: true` with `isFullModeStyle: true` adds `--backdrop` modifier on `infoCardContainer` (theme CSS required for visible overlay)
 - [x] `callToActionMode: none` hides CTA
 
 ### `list-context.info-card-list`
@@ -607,20 +841,70 @@ Use after `vtex link` with theme dependency `sunhouse.info-card-custom`.
 - [x] List-level `blockClass` inherited by all cards without repeating per `infoCards[]` item
 - [x] Multiple cards in `infoCards` render sequentially without `children`
 - [x] Cards render inside `slider-layout` when declared as `children` (requires `vtex.slider-layout` in theme)
-- [ ] Responsive layout children (`responsive-layout.desktop#…`) consume list correctly
-- [ ] Site Editor: **+ ADICIONAR** on Info Cards array; per-item props editable
-- [ ] Saving/reopening list block preserves card order and values
+- [x] Responsive layout children (`responsive-layout.desktop#…`) consume list correctly — validated 22/06/2026
+- [x] Site Editor: **+ ADICIONAR** on Info Cards array; per-item props editable — validated 22/06/2026
+- [x] Saving/reopening list block preserves card order and values — validated 22/06/2026
 
-### `blockClass` + slider (18/06/2026)
+### `blockClass` + slider (18/06/2026) — manual QA steps
 
-- [ ] Shell handles (`infoCardContainer`, `infoCardTextContainer`, `infoCardCallActionContainer`) show list `blockClass` modifiers inside slider
-- [ ] Rich Text handles (`container`, `wrapper`, `heading`, `paragraph`) show **both** slider and info-card modifiers when `textMode: rich-text`
-- [ ] Selectors like `.heading--main-banner-home` work in theme `sunhouse.slider-layout.css`
-- [ ] Multiple `blockClass` values (`["main-banner", "main-banner-home"]`) each generate separate `--{value}` modifiers
+Use a theme block setup like §8 (`list-context.info-card-list#banner-main` + `slider-layout#banner-main-slider`). Inspect the live slide in DevTools.
 
-### Site Editor vs. blocks.json
+- [x] **Shell handles** — on `infoCardContainer`, `infoCardTextContainer`, `infoCardCallActionContainer` — validated 22/06/2026
+  - List props: `"blockClass": ["main-banner", "main-banner-home"]`
+  - Slider props: `"blockClass": ["banner", "banner-main"]`
+  - **Pass:** each element's `class` includes **four separate modifiers** from the layout CSS namespace, e.g. `…--banner`, `…--banner-main`, `…--main-banner`, `…--main-banner-home`
+  - **Fail:** only slider modifiers (`--banner`, `--banner-main`) without list modifiers
 
-- [ ] Props only in component (`htmlId`, `imageAltText`, `fetchpriority`, `preload`, `linkTarget`) configurable via `blocks.json` but not visible in Site Editor
+- [x] **Rich Text handles** — validated 22/06/2026
+  - Set `"textMode": "rich-text"` on an `infoCards[]` item (headline/subhead/bodyText as markdown)
+  - Inspect `container`, `wrapper`, `heading`, `paragraph` (layout app prefix, e.g. `sunhouse-slider-layout-0-x-heading`)
+  - **Pass:** same four modifiers as shell handles on text elements
+  - **Note:** with default `textMode: html`, text uses shell handles (`infoCardHeadline`, etc.) — this check applies only to `rich-text`
+
+- [x] **Theme CSS selectors** — validated 22/06/2026
+  - Rule like `.heading--main-banner-home { … }` in layout theme CSS applies to rich-text headline inside slider
+
+- [ ] **Multiple `blockClass` values** — list `"blockClass": ["main-banner", "main-banner-home"]`:
+  - **Pass:** DOM shows `--main-banner` and `--main-banner-home` as **separate** class tokens
+  - **Fail:** chained modifier like `--main-banner--main-banner-home` on a single handle
+
+### Site Editor vs. `blocks.json` — manual QA steps
+
+Props supported by the component but **not** in `store/contentSchemas.json` (blocks.json / theme templates only):
+
+| Prop | How to verify in DevTools | Site Editor |
+| ---- | ------------------------- | ----------- |
+| `htmlId` | `id="{value}"` on the outer card container | ❌ |
+| `imageAltText` | `alt="{value}"` on the `<img>` (**half mode only**) | ❌ intentional |
+| `fetchpriority` | `fetchpriority="high"` on the `<img>` (**half mode only**) | ❌ intentional |
+| `preload` | `data-vtex-preload="true"` on the `<img>` when `"preload": true` (**half mode only**) | ❌ intentional |
+| `linkTarget` | `target` on the image link wrapper when `imageActionUrl` is set | ❌ |
+
+**Example `blocks.json` fragment** (remaining JSON-only props):
+
+```json
+{
+  "list-context.info-card-list#qa-json-props": {
+    "props": {
+      "infoCards": [
+        {
+          "headline": "QA props",
+          "isFullModeStyle": false,
+          "imageUrl": "https://storecomponents.vteximg.com.br/arquivos/banner-infocard2.png",
+          "htmlId": "info-card-qa-test",
+          "imageAltText": "Alt text from blocks.json",
+          "fetchpriority": "high",
+          "preload": true,
+          "imageActionUrl": "/",
+          "linkTarget": "_blank"
+        }
+      ]
+    }
+  }
+}
+```
+
+- [ ] JSON-only props (`htmlId`, `imageAltText`, `fetchpriority`, `preload`, `linkTarget`) reflect correctly in DOM after `vtex link` (use **half mode** for `<img>` props)
 
 ---
 
@@ -628,22 +912,32 @@ Use after `vtex link` with theme dependency `sunhouse.info-card-custom`.
 
 ### Blocking v1 publish
 
-- [ ] **Remove stale `settingsSchema`** — `manifest.json` still references `vtex.store-components` / `enableDefaultSeller` (copied from fork; irrelevant to Info Card)
-- [ ] **Publish app** — `vtex publish` after full QA on dev workspace
-- [ ] **Theme version** — pin published `sunhouse.info-card-custom` version in theme `manifest.json` (all environments)
+- [x] **Remove stale `settingsSchema`** — removed from `manifest.json` (22/06/2026)
+- [x] **Publish app** — `vtex publish` completed (`sunhouse.info-card-custom@1.0.0`)
+- [x] **Theme version** — pinned in theme `manifest.json` (all environments)
 
 ### Site Editor parity
 
-- [ ] **Add missing props to `contentSchemas.json`** — `htmlId`, `imageAltText`, `fetchpriority`, `preload`, `linkTarget` (SEO/performance fields currently blocks.json-only)
+- [~] **`imageAltText`, `fetchpriority`, `preload`** — intentionally **not** in Site Editor; props target `<img>`, absent in full-mode banners (background-image). Use `blocks.json` when half-mode cards need alt / LCP hints
+- [ ] **`htmlId`, `linkTarget` in `contentSchemas.json`** — still blocks.json-only
 - [ ] **Extend `callToActionLinkTarget` enum in contentSchemas** — add `_parent` and `_top` to match component propTypes
 
 ### Documentation & hygiene
 
 - [x] **Update `docs/README.md`** — documents `list-context.info-card-list`, block names, and theme examples
-- [x] **Trim fork message keys** — `messages/*.json` reduced from ~207 to 49 keys (see §6); locale file count unchanged
-- [ ] **Trim fork artifacts** — CHANGELOG from full store-components history; unused typings (`vtex.product-context`, etc.); optionally reduce locale **files** to `en`, `pt`, `context.json`
-- [ ] **Add `styles` builder** to `manifest.json` if theme CSS customization via `sunhouse.info-card-custom.css` is desired
-- [ ] **Add `CHANGELOG.md` entry** for v0.0.1 / list wrapper feature (or replace inherited store-components changelog)
+- [x] **Trim fork message keys** — `messages/*.json` reduced from ~207 to 53 keys (see §6)
+- [x] **Trim fork artifacts** — replaced inherited store-components `CHANGELOG.md`; removed unused typings; locale files reduced to `en`, `pt`, `context.json` (22/06/2026)
+- [~] **Add `styles` builder** to `manifest.json` — **deferred (skipped for v1.0.0)**. Rationale: list + slider themes already target the layout app CSS namespace (`sunhouse.slider-layout.css`); standalone `sunhouse.info-card-custom.css` is not required for current production usage. Revisit if merchants need app-scoped CSS handles file without composing through a layout block.
+- [x] **Add `CHANGELOG.md` entry** — sunhouse release notes for v1.0.0 (22/06/2026)
+
+### QA remaining (manual)
+
+- [ ] **`blockClass` + slider** — multiple `blockClass` array modifiers (separate `--main-banner` + `--main-banner-home` tokens)
+- [ ] **blocks.json-only props** — `htmlId`, `imageAltText`, `fetchpriority`, `preload`, `linkTarget` DOM verification (half mode for `<img>` props)
+
+### Theme / mobile (backlog — production)
+
+- [x] **Backdrop overlay height on mobile** — `--backdrop` `::after` aligned with native header on mobile viewports; fixed in theme CSS — validated 22/06/2026
 
 ### Backlog (future releases)
 
@@ -662,15 +956,17 @@ Use after `vtex link` with theme dependency `sunhouse.info-card-custom`.
 | Starting point | `vtex.store-components` InfoCard fork (v3.178.5 codebase) |
 | Final scope | Standalone Info Card app + list-context wrapper |
 | New core files | `InfoCardList`, `infoCardsAsList.js`, `InfoCardRichText.js`, `cssHandlesWithBlockClass.js`, `vtex.list-context` typings, `editorMessages.js` |
+| New props | `hasBackdrop` — per-banner backdrop overlay toggle (full mode only, §9) |
 | Blocks exported | `info-card-custom`, `list-context.info-card-list` |
 | Alignment fixes | 1 (`textMode` default) |
 | Block rename | `info-card-standalone` → `info-card-custom` |
-| CSS handle fixes | 2 (`blockClass` foundation §7; Rich Text + slider propagation §8) |
-| i18n cleanup | 207 → 49 message keys; `defineMessages` for static extraction |
+| CSS handle fixes | 3 (`blockClass` foundation §7; Rich Text + slider propagation §8; `hasBackdrop` §9) |
+| i18n cleanup | 207 → 53 message keys; locales `en` + `pt` + `context.json`; `defineMessages` for static extraction |
 | New dependency | `vtex.list-context@0.x` |
 | Build blockers | 0 |
 | Runtime blockers | 0 |
-| QA status | ✅ Basic `vtex link` + single/list render + slider blockClass fix; full slider/responsive QA pending |
+| Published | `sunhouse.info-card-custom@1.0.0` (22/06/2026) |
+| QA status | ✅ List/responsive/Site Editor + blockClass/slider (shell, Rich Text, theme CSS, backdrop mobile); ⬜ array blockClass modifiers + JSON-only props QA deferred to next update |
 
 ---
 

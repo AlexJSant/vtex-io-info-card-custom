@@ -23,6 +23,7 @@ import {
 import { SanitizedHTML } from '../SanitizedHTML.js'
 import editorMessages from '../../messages/editorMessages'
 import { resolveHandlesWithBlockClass } from '../../modules/cssHandlesWithBlockClass'
+import { formatIOUrl } from '../../modules/formatIOUrl'
 
 const ALLOWED_TAGS = ['p', 'span', 'a', 'div', 'br']
 const ALLOWED_ATTRS = {
@@ -83,6 +84,8 @@ const CSS_HANDLES = [
 const InfoCard = ({
   blockClass,
   isFullModeStyle,
+  hasBackdrop,
+  isHidden,
   headline,
   subhead,
   bodyText,
@@ -115,6 +118,22 @@ const InfoCard = ({
       resolveHandlesWithBlockClass(baseHandles, withModifiers, blockClass),
     [baseHandles, withModifiers, blockClass]
   )
+
+  const infoCardContainerHandle = useMemo(() => {
+    const base = handles.infoCardContainer
+
+    if (!hasBackdrop || !isFullModeStyle || base.includes('--backdrop')) {
+      return base
+    }
+
+    const withBackdrop = withModifiers('infoCardContainer', ['backdrop'])
+    const backdropClass = withBackdrop
+      .split(' ')
+      .find(className => className.includes('--backdrop'))
+
+    return backdropClass ? `${base} ${backdropClass}` : base
+  }, [handles.infoCardContainer, hasBackdrop, isFullModeStyle, withModifiers])
+
   const paddingClass =
     textPosition === textPostionValues.LEFT ? 'pr4-ns' : 'pl4-ns'
 
@@ -141,9 +160,11 @@ const InfoCard = ({
 
   const finalImageUrl = getImageUrl(
     mobile,
-    formatIOMessage({ id: imageUrl, intl }),
-    formatIOMessage({ id: mobileImageUrl, intl })
+    formatIOUrl(imageUrl, intl),
+    formatIOUrl(mobileImageUrl, intl)
   )
+
+  const resolvedImageActionUrl = formatIOUrl(imageActionUrl, intl)
 
   const containerStyle = isFullModeStyle
     ? {
@@ -158,7 +179,7 @@ const InfoCard = ({
     isFullModeStyle && lazyLoad ? { 'data-bg': finalImageUrl } : {}
 
   const containerClasses = classNames(
-    `${handles.infoCardContainer} items-center`,
+    `${infoCardContainerHandle} items-center`,
     {
       [`flex-ns ${flexOrderToken} bg-base ph2-ns pb2 justify-between`]:
         !isFullModeStyle,
@@ -167,7 +188,7 @@ const InfoCard = ({
     }
   )
 
-  const linkWrapperClasses = `${handles.infoCardImageLinkWrapper} no-underline`
+  const linkWrapperClasses = `${handles.infoCardImageLinkWrapper} no-underline db w-100`
 
   const textContainerClasses = classNames(
     `${handles.infoCardTextContainer} flex flex-column mw-100`,
@@ -183,9 +204,13 @@ const InfoCard = ({
 
   const bodyTextClasses = `${handles.infoCardBodyText} t-body mt6 c-on-base ${alignToken} mw-100`
 
+  if (isHidden) {
+    return null
+  }
+
   return (
     <LinkWrapper
-      imageActionUrl={formatIOMessage({ id: imageActionUrl, intl })}
+      imageActionUrl={resolvedImageActionUrl}
       extraCondition={!isFullModeStyle}
       linkProps={{ className: linkWrapperClasses, target: linkTarget }}
     >
@@ -248,7 +273,7 @@ const InfoCard = ({
           <CallToAction
             mode={callToActionMode}
             text={formatIOMessage({ id: callToActionText, intl })}
-            url={formatIOMessage({ id: callToActionUrl, intl })}
+            url={formatIOUrl(callToActionUrl, intl)}
             linkTarget={callToActionLinkTarget}
             blockClass={blockClass}
           />
@@ -256,11 +281,14 @@ const InfoCard = ({
         {!isFullModeStyle && (
           <div className={`${handles.infoCardImageContainer} w-50-ns`}>
             <LinkWrapper
-              imageActionUrl={formatIOMessage({ id: imageActionUrl, intl })}
-              linkProps={{ target: linkTarget }}
+              imageActionUrl={resolvedImageActionUrl}
+              linkProps={{
+                className: linkWrapperClasses,
+                target: linkTarget,
+              }}
             >
               <img
-                className={handles.infoCardImage}
+                className={`${handles.infoCardImage} w-100`}
                 src={finalImageUrl}
                 style={{ objectFit: 'cover' }}
                 alt={
@@ -288,17 +316,19 @@ const MemoizedInfoCard = memo(injectIntl(InfoCard))
 MemoizedInfoCard.propTypes = {
   blockClass: oneOfType([string, arrayOf(string)]),
   isFullModeStyle: bool,
+  hasBackdrop: bool,
+  isHidden: bool,
   textPosition: oneOf(getEnumValues(textPositionTypes)),
   headline: string,
   subhead: string,
   bodyText: string,
   callToActionMode: oneOf(getEnumValues(callToActionModeTypes)),
   callToActionText: string,
-  callToActionUrl: string,
-  imageUrl: string,
-  mobileImageUrl: string,
+  callToActionUrl: oneOfType([string, PropTypes.object]),
+  imageUrl: oneOfType([string, PropTypes.object]),
+  mobileImageUrl: oneOfType([string, PropTypes.object]),
   textAlignment: oneOf(getEnumValues(textAlignmentTypes)),
-  imageActionUrl: string,
+  imageActionUrl: oneOfType([string, PropTypes.object]),
   imageAltText: string,
   intl: PropTypes.object,
   htmlId: string,
@@ -310,6 +340,8 @@ MemoizedInfoCard.propTypes = {
 
 MemoizedInfoCard.defaultProps = {
   isFullModeStyle: false,
+  hasBackdrop: false,
+  isHidden: false,
   textPosition: textPositionTypes.TEXT_POSITION_LEFT.value,
   headline: '',
   subhead: '',
@@ -340,6 +372,20 @@ MemoizedInfoCard.schema = {
       default: false,
       isLayout: true,
     },
+    hasBackdrop: {
+      title: editorMessages.info_card_hasBackdrop_title.id,
+      description: editorMessages.info_card_hasBackdrop_description.id,
+      type: 'boolean',
+      default: false,
+      isLayout: true,
+    },
+    isHidden: {
+      title: editorMessages.info_card_isHidden_title.id,
+      description: editorMessages.info_card_isHidden_description.id,
+      type: 'boolean',
+      default: false,
+      isLayout: true,
+    },
     textPosition: {
       title: editorMessages.info_card_textPosition_title.id,
       description: editorMessages.info_card_textPosition_description.id,
@@ -357,12 +403,6 @@ MemoizedInfoCard.schema = {
       enumNames: getEnumNames(callToActionModeTypes),
       default: callToActionModeTypes.CALL_ACTION_BUTTON.value,
       isLayout: true,
-    },
-    imageAltText: {
-      title: editorMessages.info_card_imageAltText_title.id,
-      description: editorMessages.info_card_imageAltText_description.id,
-      type: 'string',
-      default: '',
     },
     textAlignment: {
       title: editorMessages.info_card_textAlignment_title.id,

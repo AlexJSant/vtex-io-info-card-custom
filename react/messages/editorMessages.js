@@ -81,6 +81,14 @@ const editorMessages = defineMessages({
     id: 'admin/editor.info-card.description',
     defaultMessage: 'A component with image and text which you can choose how to display',
   },
+  info_card_hasBackdrop_description: {
+    id: 'admin/editor.info-card.hasBackdrop.description',
+    defaultMessage: 'Adds a dark overlay on the background image. Only applies when image is used as background',
+  },
+  info_card_hasBackdrop_title: {
+    id: 'admin/editor.info-card.hasBackdrop.title',
+    defaultMessage: 'Backdrop overlay',
+  },
   info_card_headline_description: {
     id: 'admin/editor.info-card.headline.description',
     defaultMessage: 'Headline text inside component',
@@ -120,6 +128,14 @@ const editorMessages = defineMessages({
   info_card_isFullModeStyle_title: {
     id: 'admin/editor.info-card.isFullModeStyle.title',
     defaultMessage: 'Image as background',
+  },
+  info_card_isHidden_description: {
+    id: 'admin/editor.info-card.isHidden.description',
+    defaultMessage: 'When enabled, this banner is not rendered on the page. Useful for seasonal banners without removing configuration',
+  },
+  info_card_isHidden_title: {
+    id: 'admin/editor.info-card.isHidden.title',
+    defaultMessage: 'Hide banner',
   },
   info_card_mobileImageUrl_description: {
     id: 'admin/editor.info-card.mobileImageUrl.description',

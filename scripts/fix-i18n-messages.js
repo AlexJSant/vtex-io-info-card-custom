@@ -10,12 +10,41 @@ const USED_KEY_SOURCES = [
 ]
 
 const pattern = /admin\/editor\.[a-zA-Z0-9._-]+/g
+const editorMessageRefPattern = /editorMessages\.(\w+)/g
 const usedKeys = new Set()
+
+const editorMessagesPath = path.join(ROOT, 'react/messages/editorMessages.js')
+const editorMessageKeyToId = {}
+
+if (fs.existsSync(editorMessagesPath)) {
+  const editorMessagesContent = fs.readFileSync(editorMessagesPath, 'utf8')
+
+  for (const match of editorMessagesContent.match(pattern) || []) {
+    usedKeys.add(match)
+  }
+
+  const entryPattern = /(\w+):\s*\{\s*id:\s*'(admin\/editor[^']+)'/g
+  let entryMatch
+
+  while ((entryMatch = entryPattern.exec(editorMessagesContent)) !== null) {
+    editorMessageKeyToId[entryMatch[1]] = entryMatch[2]
+  }
+}
 
 for (const file of USED_KEY_SOURCES) {
   const content = fs.readFileSync(path.join(ROOT, file), 'utf8')
+
   for (const match of content.match(pattern) || []) {
     usedKeys.add(match)
+  }
+
+  for (const match of content.match(editorMessageRefPattern) || []) {
+    const messageKey = match[1]
+    const id = editorMessageKeyToId[messageKey]
+
+    if (id) {
+      usedKeys.add(id)
+    }
   }
 }
 
@@ -46,10 +75,7 @@ export default editorMessages
 `
 
 fs.mkdirSync(path.join(ROOT, 'react/messages'), { recursive: true })
-fs.writeFileSync(
-  path.join(ROOT, 'react/messages/editorMessages.js'),
-  editorMessagesContent
-)
+fs.writeFileSync(editorMessagesPath, editorMessagesContent)
 
 const messagesDir = path.join(ROOT, 'messages')
 for (const file of fs.readdirSync(messagesDir)) {
